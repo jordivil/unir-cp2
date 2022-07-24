@@ -1,0 +1,4 @@
+---
+# handlers file for nodos_kubernetes-role
+- name:  Recarga conf sistema
+  shell: sysctl --system

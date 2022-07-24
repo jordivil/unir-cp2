@@ -1,0 +1,99 @@
+---
+# tasks file for master-role
+- name: Hostname establecido
+  hostname:
+    name: master.unircp2.net
+- name: Activado puertos firewall Master
+  ansible.posix.firewalld:
+    port: "{{ item  }}"
+    permanent: yes
+    state: enabled
+  with_items:
+    - "6443/tcp"
+    - "2379-2380/tcp"
+    - "10250-10252/tcp"
+    - "10255/tcp"
+    - "8285/udp"
+    - "8472/udp"
+- name: habilitado cortafuegos para workers
+  ansible.posix.firewalld:
+    rich_rule: "rule family=ipv4 source address=10.0.2.4/32 port port=6443 protocol=tcp accept"
+    permanent: yes
+    state: enabled
+- name: recargado servicio firewalld
+  systemd:
+    name: firewalld
+    state: reloaded
+- name: configurar kubeadm
+  shell: "kubeadm config images pull"
+- name: instala plugin CNI y define red de pods
+  shell: "kubeadm init --pod-network-cidr {{ subred }}"
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Directorio config Kube creado
+  file:
+    path: "{{ directorio_config_kube }}"
+    state: directory
+    group: ansible
+    owner: ansible
+    mode: u=rwx,g=rwx,o=rwx
+    recurse: yes
+- name: copiado archivo conf
+  copy:
+    src: /etc/kubernetes/admin.conf
+    remote_src: yes
+    dest: /home/ansible/.kube/config
+    mode: u=rwx,g=rwx,o=rwx
+    owner: ansible
+    group: ansible
+- name: obtenido comando con token para conectar worker
+  shell: "kubeadm token create --print-join-command"
+  register: comando_join_worker
+- name: asignada variable fact para join del worker
+  set_fact:
+    join_worker: "{{comando_join_worker.stdout}}"
+  delegate_to: master.unircp2.net
+  delegate_facts: true
+- name: Vista comando conexión workers
+  debug:
+    var: join_worker
+- name: creando directorio temporal
+  file:
+    path: "/home/ansible/tmp"
+    state: directory
+    group: ansible
+    owner: ansible
+    mode: u=rwx,g=rwx,o=rwx
+    recurse: yes
+- name: obteniendo yaml definición políticas de red en Master
+  get_url:
+    url:  https://docs.projectcalico.org/manifests/canal.yaml
+    dest: /home/ansible/tmp/canal.yaml
+- name: instalada libreria kubernetes para Python
+  pip:
+    name: kubernetes
+    executable: pip3
+    state: present
+- name: definicion políticas de red en Master
+  k8s:
+    state: present
+    src: /home/ansible/tmp/canal.yaml
+  become: false
+- name: reiniciar host
+  ansible.builtin.reboot:
+    msg: "Estamos reiniciando..."
+    connect_timeout: 5
+    reboot_timeout: 600
+    pre_reboot_delay: 5
+    post_reboot_delay: 30
+    test_command: whoami
+- name: Obteniendo yaml Ingress Controller HAProxy
+  get_url:
+    url:  https://raw.githubusercontent.com/haproxytech/kubernetes-ingress/master/deploy/haproxy-ingress.yaml
+    dest: /home/ansible/tmp/haproxy-ingress.yaml
+- name: Instalacion Ingress Controller HAProxy
+  k8s:
+    state: present
+    src: /home/ansible/tmp/haproxy-ingress.yaml
+  become: false

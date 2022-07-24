@@ -1,0 +1,7 @@
+---
+# handlers file for nfs-role
+- name: reinicia servidor NFS
+  ansible.builtin.service:
+    name: nfs-server
+    state: restarted
+    enabled: true

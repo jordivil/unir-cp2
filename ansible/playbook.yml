@@ -1,0 +1,81 @@
+---
+- name: Levantar Kubernetes
+  hosts: all 
+  become: true
+# tasks en todos los nodos  
+  tasks:
+  - name: Establece timezone
+    timezone:
+      name: "{{ timezone }}"
+  - name: Repositorios actualizados
+    dnf:
+      name: "*"
+      state: latest
+  - name: Instalado / actualizado chrony + firewalld
+    dnf:
+      name: "{{ item }}"
+      state: latest
+    with_items:
+    - 'chrony'
+    - 'firewalld'
+  - name: servicios activos y habilitados
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items: 
+      - chronyd
+      - firewalld
+  - name: creado archivo resolución nombres hosts
+    lineinfile:
+      path: /etc/hosts
+      state: present
+      line: "{{ item }}"
+    with_items:
+    - "10.0.2.5  master.unircp2.net  master"
+    - '10.0.2.4  worker.unircp2.net  worker'
+    - '10.0.2.6  nfs.unircp2.net nfs'
+  - name: Deshabilitado SELinux
+    selinux:
+      state: disabled
+    notify: "reiniciar hosts"
+    
+  # ** Prueba para crear fichero hosts leyendo las IPs y nombres de host
+  # - name: Crea archivo hosts
+  #   lineinfile: 
+  #     dest: /etc/hosts 
+  #     line: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address']}} {{ hostvars[inventory_hostname]['ansible_nodename'] }} {{hostvars[inventory_hostname]['ansible_hostname'] }}" 
+  #     state: present
+  #   with_items:
+  #    - "{{groups['all']}}"
+
+# tasks específicas
+  - name: Tareas NFS
+    include_role:
+      name: nfs-role
+    when: inventory_hostname in groups['nodos_nfs']
+  - name: Tareas comunes 'nodos_kubernetes'
+    include_role:
+      name: nodos_kubernetes-role
+    when: inventory_hostname in groups['nodos_kubernetes']
+  - name: Tareas MASTER
+    include_role:
+      name: master-role
+    when: inventory_hostname in groups['nodos_master']
+  - name: Tareas WORKER
+    include_role:
+      name: worker-role
+    when: inventory_hostname in groups['nodos_worker']
+  - name: Tareas APP
+    include_role:
+      name: app-role
+
+  handlers:
+  - name: reiniciar hosts
+    ansible.builtin.reboot:
+      msg: "Estamos reiniciando... sin delay"
+      connect_timeout: 5
+      reboot_timeout: 600
+      pre_reboot_delay: 0
+      post_reboot_delay: 30
+      test_command: whoami

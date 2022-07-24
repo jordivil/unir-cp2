@@ -1,0 +1,21 @@
+master.unircp2.net ansible_host=20.254.45.159
+worker.unircp2.net ansible_host=20.0.35.253
+nfs.unircp2.net ansible_host=20.0.35.208
+
+[all:vars]
+subred=10.0.2.0/24
+ansible_user='ansible'
+timezone='Europe/Madrid'
+
+[nodos_kubernetes]
+master.unircp2.net
+worker.unircp2.net
+
+[nodos_master]
+master.unircp2.net
+
+[nodos_worker]
+worker.unircp2.net
+
+[nodos_nfs]
+nfs.unircp2.net

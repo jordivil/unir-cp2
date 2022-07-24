@@ -1,0 +1,27 @@
+---
+# tasks file for worker-role
+- name: Hostname establecido
+  hostname:
+    name: worker.unircp2.net
+- name: Activado puertos firewall Worker
+  ansible.posix.firewalld:
+    port: "{{ item  }}"
+    permanent: yes
+    state: enabled
+  with_items:
+    - "10250/tcp"
+    - "30000-32767/tcp"
+    - "8285/udp"
+    - "8472/udp"
+- name: recargado servicio firewalld
+  systemd:
+    name: firewalld
+    state: reloaded
+- name: comando de join al cluster 
+  shell: "{{ hostvars['master.unircp2.net']['join_worker'] }}"
+  register: salida_join
+  args:
+    creates: /etc/kubernetes/kubelet.conf      
+- name: Salida del comando de Join al cluster
+  debug:
+    var: salida_join.stdout

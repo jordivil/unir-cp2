@@ -1,0 +1,48 @@
+---
+# tasks file for nfs-role
+- name: Hostname establecido
+  hostname:
+    name: nfs.unircp2.net
+- name: Utilidades NFS instaladas
+  dnf:
+    name: nfs-utils
+    state: latest
+- name: Directorio a compartir creado
+  file:
+    path: "{{ directorio_compartido }}"
+    state: directory
+    group: nobody
+    owner: nobody
+    mode: u=rwx,g=rwx,o=rwx
+    recurse: yes
+- name: Línea del directorio en exports para server NFS
+  lineinfile:
+    path: /etc/exports
+    line: "{{ directorio_compartido }} {{ ansible_default_ipv4['network'] }}/24 (rw,sync,no_subtree_check)"
+- name: Servicio nfs server activo y habilitado al reiniciar
+  service:
+    name: nfs-server
+    state: started
+    enabled: yes
+- name: Exportado fs
+  command:
+    exportfs -arv
+- name: comprobado exportfs
+  command: 
+    exportfs -s
+  register:
+    salida_export
+- name: Resultado exportfs
+  debug:
+    msg: "{{ salida_export.stdout_lines }}"
+- name: Habilitado reglas firewall para NFS
+  firewalld:
+    service:
+      "{{ item }}"
+    state: enabled
+    permanent: true
+    immediate: true
+  with_items:
+    - nfs
+    - rpc-bind
+    - mountd
