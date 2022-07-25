@@ -69,6 +69,7 @@
   - name: Tareas APP
     include_role:
       name: app-role
+    when: inventory_hostname in groups['nodos_master']
 
   handlers:
   - name: reiniciar hosts
