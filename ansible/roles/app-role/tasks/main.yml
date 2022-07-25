@@ -1,2 +1,48 @@
 ---
 # tasks file for app-role
+  - name: Existe namespace appcp2
+    k8s:
+      name: appcp2
+      api_version: v1
+      kind: Namespace
+      state: present
+    become: false
+  - name: Asignado Volumen persistente
+    k8s:
+
+    become: false
+  - name: Despliegue Apache
+    k8s:
+      state: present
+      definition:
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: httpd-deployment-appcp2
+          namespace: appcp2
+          labels:
+            app: httpd_app_cp2
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: httpd_app_cp2
+          template:
+            metadata:
+              labels:
+                app: httpd_app_cp2
+            spec:
+              containers:
+                - name: httpd-container-cp2
+                  image: httpd:latest
+                  volumeMounts:
+                    - name: volumen-nfs
+                      mountPath: /var/www
+                  ports:
+                    - containerPort: 80
+              volumes:
+                - name: volumen-nfs
+                  nfs:
+                    server: nfs.unircp2.net
+                    path: /mnt/vol_kubernetes
+    become: false
